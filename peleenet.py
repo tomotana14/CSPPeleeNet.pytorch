@@ -155,19 +155,6 @@ class PeleeNet(nn.Module):
 
 if __name__ == '__main__':
     net = PeleeNet(partial_ratio=0.5)
-    from ptflops import get_model_complexity_info
-    from thop import profile
-
     input = torch.randn(1, 3, 224, 224)
-    macs, params = profile(net, inputs=(input, ))
-    from thop import clever_format
-    macs, params = clever_format([macs, params], "%.3f")
-    print(macs)
-    print(params)
-    # macs, params = get_model_complexity_info(net, (3, 224, 224), as_strings=True,
-    #                                         print_per_layer_stat=True, verbose=False)
-    #print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
-    #print('{:<30}  {:<8}'.format('Number of parameters: ', params))
-    #x = torch.randn(1, 3, 224, 224)
-    #y = net(x)
-    # print(y.shape)
+    res = net(input)
+    print(res.shape)
