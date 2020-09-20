@@ -52,14 +52,14 @@ def get_dataflow(args):
 
 
 def initialize(args):
-    model = PeleeNet(partial_ratio=args.partial_ratio).to(args.device)
+    model = PeleeNet(nclass=args.nclass, partial_ratio=args.partial_ratio).to(args.device)
     optimizer = optim.SGD(
         model.parameters(),
         lr=args.lr,
         momentum=args.momentum,
         weight_decay=args.wd,
     )
-    criterion = LabelSmoothKLDivLoss(device=args.device)
+    criterion = LabelSmoothKLDivLoss(nclass=args.nclass, device=args.device)
     lr_scheduler = CosineAnnealingScheduler(optimizer, "lr", start_value=args.lr, end_value=0, cycle_size=args.epochs*args.niter_per_epoch)
     return model, optimizer, criterion, lr_scheduler
 
@@ -104,8 +104,7 @@ def main(args):
     @trainer.on(Events.EPOCH_COMPLETED)
     def eval_model(engine):
         epoch = trainer.state.epoch
-        evaluator.run(val_loader)
-        state = evaluator.state.metrics
+        state = evaluator.run(val_loader)
         log_metrics(evaluator.logger, epoch, state.times["COMPLETED"], state.metrics)
     
     common.save_best_model_by_val_score(
@@ -120,6 +119,7 @@ if __name__ == '__main__':
     parser.add_argument("-j", "--workers", default=4, type=int, metavar="N")
     parser.add_argument("-b", "--batch_size", default=128, type=int, metavar="N")
     parser.add_argument("--epochs", default=240, type=int)
+    parser.add_argument("--nclass", default=1000, type=int)
     parser.add_argument("--lr", "--learning_rate", default=5e-2, type=float)
     parser.add_argument("--momentum", default=0.9, type=float)
     parser.add_argument("--wd", "--weight_decay", default=4e-5, type=float)
