@@ -8,10 +8,8 @@ import torch.backends.cudnn as cudnn
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
-import ignite
-from ignite.engine import Events, Engine, create_supervised_evaluator, create_supervised_trainer
+from ignite.engine import Events, create_supervised_evaluator, create_supervised_trainer
 from ignite.metrics import Accuracy, Loss, TopKCategoricalAccuracy
-from ignite.handlers import Checkpoint
 from ignite.utils import manual_seed, setup_logger
 from ignite.contrib.engines import common
 from ignite.contrib.handlers import ProgressBar, CosineAnnealingScheduler
@@ -81,7 +79,6 @@ def main(args):
         cudnn.benchmark = True
     args.device = device
 
-    logger = setup_logger(name="ImageNet-Training")
     output_path = Path(os.path.join(args.savedir))
     if not output_path.exists():
         output_path.mkdir(parents=True)
@@ -127,7 +124,6 @@ if __name__ == '__main__':
     parser.add_argument("--momentum", default=0.9, type=float)
     parser.add_argument("--wd", "--weight_decay", default=4e-5, type=float)
     parser.add_argument("--savedir", default="saved_models", type=str)
-    parser.add_argument("--name", type=str)
     parser.add_argument("--partial_ratio", type=float, default=1.0)
     args = parser.parse_args()
     main(args)
