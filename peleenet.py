@@ -135,7 +135,6 @@ class PeleeNet(nn.Module):
         for i, n in enumerate(nblocks):
             if (i+1) == len(nblocks):
                 pool = False
-            print(pool)
             if partial_ratio < 1.0:
                 stage = CSPDenseStage(
                     current_ch, n, growth_rate, pool, partial_ratio)
