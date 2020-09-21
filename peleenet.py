@@ -112,7 +112,7 @@ class CSPDenseStage(nn.Module):
             "transition1", TransitionBlock(current_ch, pool=False))
         self.dense_branch = dense_branch
         self.transition2 = TransitionBlock(
-            current_ch + inp - split_ch, pool=True)
+            current_ch + inp - split_ch, pool=pool)
 
     def forward(self, x):
         x1 = x[:, :self.split_ch, ...]
@@ -135,6 +135,7 @@ class PeleeNet(nn.Module):
         for i, n in enumerate(nblocks):
             if (i+1) == len(nblocks):
                 pool = False
+            print(pool)
             if partial_ratio < 1.0:
                 stage = CSPDenseStage(
                     current_ch, n, growth_rate, pool, partial_ratio)
@@ -154,7 +155,16 @@ class PeleeNet(nn.Module):
 
 
 if __name__ == '__main__':
+    import torch.onnx
     net = PeleeNet(partial_ratio=0.5)
     input = torch.randn(1, 3, 224, 224)
     res = net(input)
-    print(res.shape)
+    
+    torch.onnx.export(net, input, "csppeleenet50.onnx", verbose=False)
+    """
+    from thop import profile, clever_format 
+    macs, params = profile(net, inputs=(input, ))
+    macs, params = clever_format([macs, params], "%.3f")
+    print(macs)
+    print(params)
+    """
