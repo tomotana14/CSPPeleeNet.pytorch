@@ -48,15 +48,15 @@ class StemBlock(nn.Module):
 
 
 class TwoWayDenseBlock(nn.Module):
-    def __init__(self, inp, growth_rate):
+    def __init__(self, inp, growth_rate, inter_ch):
         super(TwoWayDenseBlock, self).__init__()
         self.left = nn.Sequential(
-            Conv1x1(inp, 2*growth_rate, 1, 0),
-            Conv3x3(2*growth_rate, growth_rate//2, 1, 1)
+            Conv1x1(inp, inter_ch, 1, 0),
+            Conv3x3(inter_ch, growth_rate//2, 1, 1)
         )
         self.right = nn.Sequential(
-            Conv1x1(inp, 2*growth_rate, 1, 0),
-            Conv3x3(2*growth_rate, growth_rate//2, 1, 1),
+            Conv1x1(inp, inter_ch, 1, 0),
+            Conv3x3(inter_ch, growth_rate//2, 1, 1),
             Conv3x3(growth_rate//2, growth_rate//2, 1, 1)
         )
 
@@ -80,14 +80,14 @@ class TransitionBlock(nn.Sequential):
 
 
 class DenseStage(nn.Module):
-    def __init__(self, inp, nblocks, growth_rate, pool):
+    def __init__(self, inp, nblock, bwidth, growth_rate, pool):
         super(DenseStage, self).__init__()
         current_ch = inp
-
+        inter_ch = int(growth_rate // 2 * bwidth / 4) * 4
         stage = nn.Sequential()
-        for i in range(nblocks):
+        for i in range(nblock):
             stage.add_module("dense{}".format(
-                i+1), TwoWayDenseBlock(current_ch, growth_rate))
+                i+1), TwoWayDenseBlock(current_ch, growth_rate, inter_ch))
             current_ch += growth_rate
         stage.add_module("transition", TransitionBlock(current_ch, pool=pool))
         self.stage = stage
@@ -97,16 +97,17 @@ class DenseStage(nn.Module):
 
 
 class CSPDenseStage(nn.Module):
-    def __init__(self, inp, nblocks, growth_rate, pool, partial_ratio):
+    def __init__(self, inp, nblock, bwidth, growth_rate, pool, partial_ratio):
         super(CSPDenseStage, self).__init__()
 
         split_ch = int(inp * partial_ratio)
+        inter_ch = int(growth_rate // 2 * bwidth / 4) * 4
         self.split_ch = split_ch
         dense_branch = nn.Sequential()
         current_ch = split_ch
-        for i in range(nblocks):
+        for i in range(nblock):
             dense_branch.add_module("dense{}".format(
-                i+1), TwoWayDenseBlock(current_ch, growth_rate))
+                i+1), TwoWayDenseBlock(current_ch, growth_rate, inter_ch))
             current_ch += growth_rate
         dense_branch.add_module(
             "transition1", TransitionBlock(current_ch, pool=False))
@@ -125,23 +126,26 @@ class CSPDenseStage(nn.Module):
 
 
 class PeleeNet(nn.Module):
-    def __init__(self, inp=3, nclass=1000, growth_rate=32, nblocks=[3, 4, 8, 6], partial_ratio=1.0):
+    def __init__(self, inp=3, nclass=1000, growth_rate=32, nblocks=[3, 4, 8, 6],
+                 bottleneck_widths=[1/2, 1, 2, 4], partial_ratio=1.0):
         super(PeleeNet, self).__init__()
 
         self.stem = StemBlock(inp)
         current_ch = 32
         stages = nn.Sequential()
         pool = True
-        for i, n in enumerate(nblocks):
+        assert len(nblocks) == len(bottleneck_widths)
+        for i, (nblock, bwidth) in enumerate(zip(nblocks, bottleneck_widths)):
             if (i+1) == len(nblocks):
                 pool = False
             if partial_ratio < 1.0:
                 stage = CSPDenseStage(
-                    current_ch, n, growth_rate, pool, partial_ratio)
+                    current_ch, nblock, bwidth, growth_rate, pool, partial_ratio)
             else:
-                stage = DenseStage(current_ch, n, growth_rate, pool)
+                stage = DenseStage(current_ch, nblock,
+                                   bwidth, growth_rate, pool)
             stages.add_module("stage{}".format(i+1), stage)
-            current_ch += growth_rate * n
+            current_ch += growth_rate * nblock
         self.stages = stages
         self.classifier = nn.Linear(current_ch, nclass)
 
@@ -158,12 +162,10 @@ if __name__ == '__main__':
     net = PeleeNet(partial_ratio=0.5)
     input = torch.randn(1, 3, 224, 224)
     res = net(input)
-    
+
     torch.onnx.export(net, input, "csppeleenet50.onnx", verbose=False)
-    """
-    from thop import profile, clever_format 
+    from thop import profile, clever_format
     macs, params = profile(net, inputs=(input, ))
     macs, params = clever_format([macs, params], "%.3f")
     print(macs)
     print(params)
-    """

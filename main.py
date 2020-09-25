@@ -29,7 +29,7 @@ def get_dataflow(args):
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize
-            ])
+        ])
     )
     val_dataset = datasets.ImageFolder(
         os.path.join(args.data, "val"),
@@ -38,7 +38,7 @@ def get_dataflow(args):
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize
-            ])
+        ])
     )
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=True,
@@ -52,7 +52,8 @@ def get_dataflow(args):
 
 
 def initialize(args):
-    model = PeleeNet(nclass=args.nclass, partial_ratio=args.partial_ratio).to(args.device)
+    model = PeleeNet(nclass=args.nclass,
+                     partial_ratio=args.partial_ratio).to(args.device)
     optimizer = optim.SGD(
         model.parameters(),
         lr=args.lr,
@@ -60,14 +61,16 @@ def initialize(args):
         weight_decay=args.wd,
     )
     criterion = LabelSmoothKLDivLoss(nclass=args.nclass, device=args.device)
-    lr_scheduler = CosineAnnealingScheduler(optimizer, "lr", start_value=args.lr, end_value=0, cycle_size=args.epochs*args.niter_per_epoch)
+    lr_scheduler = CosineAnnealingScheduler(
+        optimizer, "lr", start_value=args.lr, end_value=0, cycle_size=args.epochs*args.niter_per_epoch)
     return model, optimizer, criterion, lr_scheduler
 
 
 def log_metrics(logger, epoch, elapsed, metrics):
     logger.info(
         "\nEpoch {} = elapsed: {} - metrics:\n {}".format(
-            epoch, elapsed, "\n".join(["\t{}: {}".format(k, v) for k,v in metrics.items()])
+            epoch, elapsed, "\n".join(
+                ["\t{}: {}".format(k, v) for k, v in metrics.items()])
         )
     )
 
@@ -86,8 +89,9 @@ def main(args):
     train_loader, val_loader = get_dataflow(args)
     args.niter_per_epoch = len(train_loader)
     model, optimizer, criterion, lr_scheduler = initialize(args)
-    
-    trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
+
+    trainer = create_supervised_trainer(
+        model, optimizer, criterion, device=device)
     trainer.logger = setup_logger(name="trainer")
     trainer.add_event_handler(Events.ITERATION_STARTED, lr_scheduler)
     pbar = ProgressBar()
@@ -98,15 +102,17 @@ def main(args):
         "accuracy5": TopKCategoricalAccuracy(),
         "loss": Loss(criterion),
     }
-    evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
+    evaluator = create_supervised_evaluator(
+        model, metrics=metrics, device=device)
     evaluator.logger = setup_logger(name="evaluator")
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def eval_model(engine):
         epoch = trainer.state.epoch
         state = evaluator.run(val_loader)
-        log_metrics(evaluator.logger, epoch, state.times["COMPLETED"], state.metrics)
-    
+        log_metrics(evaluator.logger, epoch,
+                    state.times["COMPLETED"], state.metrics)
+
     common.save_best_model_by_val_score(
         output_path, evaluator, model=model, metric_name="accuracy1", n_saved=3, trainer=trainer, tag="test"
     )
@@ -117,9 +123,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("data", metavar="DIR")
     parser.add_argument("-j", "--workers", default=4, type=int, metavar="N")
-    parser.add_argument("-b", "--batch_size", default=128, type=int, metavar="N")
+    parser.add_argument("-b", "--batch_size", default=128,
+                        type=int, metavar="N")
     parser.add_argument("--epochs", default=240, type=int)
+    parser.add_argument("--start_epoch", default=1, type=int)
     parser.add_argument("--nclass", default=1000, type=int)
+    parser.add_argument("--checkpoint", type=str)
     parser.add_argument("--lr", "--learning_rate", default=5e-2, type=float)
     parser.add_argument("--momentum", default=0.9, type=float)
     parser.add_argument("--wd", "--weight_decay", default=4e-5, type=float)
