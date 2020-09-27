@@ -84,41 +84,31 @@ class DenseStage(nn.Module):
         super(DenseStage, self).__init__()
         current_ch = inp
         inter_ch = int(growth_rate // 2 * bwidth / 4) * 4
-        stage = nn.Sequential()
-        for i in range(nblock):
-            stage.add_module("dense{}".format(
-                i+1), TwoWayDenseBlock(current_ch, growth_rate, inter_ch))
-            current_ch += growth_rate
-        stage.add_module("transition", TransitionBlock(current_ch, pool=pool))
-        self.stage = stage
-
-    def forward(self, x):
-        return self.stage(x)
-
-
-class CSPDenseStage(nn.Module):
-    def __init__(self, inp, nblock, bwidth, growth_rate, pool, partial_ratio):
-        super(CSPDenseStage, self).__init__()
-
-        split_ch = int(inp * partial_ratio)
-        inter_ch = int(growth_rate // 2 * bwidth / 4) * 4
-        self.split_ch = split_ch
         dense_branch = nn.Sequential()
-        current_ch = split_ch
         for i in range(nblock):
             dense_branch.add_module("dense{}".format(
                 i+1), TwoWayDenseBlock(current_ch, growth_rate, inter_ch))
             current_ch += growth_rate
         dense_branch.add_module(
-            "transition1", TransitionBlock(current_ch, pool=False))
+            "transition1", TransitionBlock(current_ch, pool=pool))
         self.dense_branch = dense_branch
-        self.transition2 = TransitionBlock(
-            current_ch + inp - split_ch, pool=pool)
+
+    def forward(self, x):
+        return self.dense_branch(x)
+
+
+class CSPDenseStage(DenseStage):
+    def __init__(self, inp, nblock, bwidth, growth_rate, pool, partial_ratio):
+        split_ch = int(inp * partial_ratio)
+        super(CSPDenseStage, self).__init__(
+            split_ch, nblock, bwidth, growth_rate, False)
+        self.split_ch = split_ch
+        current_ch = inp + (growth_rate * nblock)
+        self.transition2 = TransitionBlock(current_ch, pool=pool)
 
     def forward(self, x):
         x1 = x[:, :self.split_ch, ...]
         x2 = x[:, self.split_ch:, ...]
-
         feat1 = self.dense_branch(x1)
         feat = torch.cat([x2, feat1], dim=1)
         feat = self.transition2(feat)
@@ -127,7 +117,7 @@ class CSPDenseStage(nn.Module):
 
 class PeleeNet(nn.Module):
     def __init__(self, inp=3, nclass=1000, growth_rate=32, nblocks=[3, 4, 8, 6],
-                 bottleneck_widths=[1/2, 1, 2, 4], partial_ratio=1.0):
+                 bottleneck_widths=[1, 2, 4, 4], partial_ratio=1.0):
         super(PeleeNet, self).__init__()
 
         self.stem = StemBlock(inp)
@@ -160,9 +150,9 @@ class PeleeNet(nn.Module):
 if __name__ == '__main__':
     import torch.onnx
     net = PeleeNet(partial_ratio=0.5)
+    print(net)
     input = torch.randn(1, 3, 224, 224)
     res = net(input)
-
     torch.onnx.export(net, input, "csppeleenet50.onnx", verbose=False)
     from thop import profile, clever_format
     macs, params = profile(net, inputs=(input, ))
