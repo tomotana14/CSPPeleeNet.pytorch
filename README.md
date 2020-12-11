@@ -20,6 +20,6 @@ net = PeleeNet(partial_ratio=1.0)
 net = PeleeNet(partial_ratio=0.5)
 ```
 
-# Reference
+# References
 [1] [CSPNet: A New Backbone that can Enhance Learning Capability of CNN](https://arxiv.org/abs/1911.11929)  
 [2] [Pelee: A Real-Time Object Detection System on Mobile Devices](https://arxiv.org/abs/1804.06882)
