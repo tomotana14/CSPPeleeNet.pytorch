@@ -11,13 +11,9 @@ Unofficial PyTorch implementation of CSPPeleeNet[1]
 
 Usage
 ```
-from peleenet import PeleeNet
+import torch
 
-# peleenet
-net = PeleeNet(partial_ratio=1.0)
-
-# csppeleenet (gamma=0.5)
-net = PeleeNet(partial_ratio=0.5)
+net = torch.hub.load('tomotana14/CSPPeleeNet.pytorch', 'csppeleenet', pretrained=True)
 ```
 
 # References
